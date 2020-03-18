@@ -24,6 +24,7 @@ class EventProcessor:
 
     def process_sample(self, ip, dso, sym=None):
         source, lineno = self.retrieve_dso(dso).source_lineno(ip)
+        print(source + ':' + str(lineno))
         self.retrieve_source(source).increment_samples(lineno)
 
     def retrieve_dso(self, dso):
@@ -57,9 +58,40 @@ class DynamicSharedObject:
         self.entries = sorted(entries, key=lambda entry: entry[2])
         self.keys = [entry[2] for entry in self.entries]
 
+        self.path_resolver = DynamicSharedObject.PathResolver(path)
+
     def source_lineno(self, address):
-        entry = self.entries[bisect.bisect_left(self.keys, address)]
-        return (entry[0], entry[1])
+        entry = self.entries[bisect.bisect_right(self.keys, address) - 1]
+        return (self.path_resolver.expand_path(entry[0], address=address), entry[1])
+
+    class PathResolver:
+        def __init__(self, dso):
+            dwarf_info = subprocess.check_output(['objdump', '--dwarf=info', dso])
+            entries = []
+            for match in re.finditer('\n\s+<[\da-f]+>\s+DW_AT_comp_dir\s+: \([^)]+\): (?P<comp_dir>.+)' +
+                                    '(\n\s+<[\da-f]+>\s+DW_AT_ranges\s+: .+)?' +
+                                     '\n\s+<[\da-f]+>\s+DW_AT_low_pc\s+: (?P<low_pc>0x[\da-f]+)\n', dwarf_info):
+                entries.append((match.group('comp_dir'), int(match.group('low_pc'), 0)))
+
+            # List of `(comp_dir, low_pc)` sorted by `low_pc` for bisect
+            self.entries = sorted(entries, key=lambda entry: entry[1])
+            self.keys = [entry[1] for entry in self.entries]
+
+            self.abs_paths = {}
+
+        def expand_path(self, path, address):
+            if os.path.isabs(path):
+                return path
+            elif path in self.abs_paths:
+                return self.abs_paths[path]
+            else:
+                self.abs_paths[path] = os.path.normpath(
+                    os.path.join(self.comp_dir(address), path))
+                return self.abs_paths[path]
+
+        def comp_dir(self, address):
+            entry = self.entries[bisect.bisect_right(self.keys, address) - 1]
+            return entry[0]
 
 # lineno => samples
 class Source:
