@@ -205,7 +205,8 @@ def trace_begin():
     processor = EventProcessor()
 
 def process_event(event):
-    # TODO: show processed traces as progress?
+    if sys.stdout.isatty():
+        print('Processed: ' + str(processor.total_events) + '\r'),
     processor.process_event(**event)
 
 def trace_end():
