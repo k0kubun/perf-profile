@@ -134,15 +134,20 @@ class SourceAnnotator:
         if not lineno_rates:
             return
 
-        with open(source.path, 'r') as f:
-            lines = f.readlines()
+        try:
+            with open(source.path, 'r') as f:
+                lines = f.readlines()
+        except IOError as e:
+            print('\nFailed to annotate: ' + source.path)
+            print(e)
+            return
         linenos = self.pick_linenos(lineno_rates.keys(), len(lines))
 
         print('\nFrom: ' + source.path)
         prev_lineno = None
         for lineno in linenos:
             if prev_lineno and lineno != prev_lineno + 1:
-                print('')
+                print
             prev_lineno = lineno
 
             line = lines[lineno - 1].rstrip()
