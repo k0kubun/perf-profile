@@ -1,4 +1,5 @@
 # encoding: utf-8
+import argparse
 import bisect
 import os
 import re
@@ -126,8 +127,9 @@ class SourceAnnotator:
     GREEN = u'\u001b[32m'
     CLEAR = u'\u001b[0m'
 
-    def __init__(self, total_events):
+    def __init__(self, total_events, pretty):
         self.total_events = total_events
+        self.pretty = pretty
 
     def annotate(self, source):
         lineno_rates = self.calc_and_filter_rates(source.lineno_samples)
@@ -153,16 +155,22 @@ class SourceAnnotator:
             line = lines[lineno - 1].rstrip()
             if lineno in lineno_rates:
                 rate = lineno_rates[lineno]
-                if rate >= self.TOP_PERCENT:
-                    color = self.RED
-                elif rate >= self.MED_PERCENT:
-                    color = self.GREEN
-                else:
-                    color = ''
-                print(u'[%6d (%5.2f%%)] │%6d │ [%s]'.replace('[', color).replace(']', self.CLEAR) % (
+                print(self.prettify('[%6d (%5.2f%%)] |%6d | [%s]', rate) % (
                     source.lineno_samples[lineno], rate, lineno, line))
             else:
-                print('                │%6d │ %s' % (lineno, line))
+                print(self.prettify('                |%6d | %s') % (lineno, line))
+
+    def prettify(self, text, rate=0.0):
+        if not self.pretty:
+            return text.replace('[', '').replace(']', '')
+
+        if rate >= self.TOP_PERCENT:
+            color = self.RED
+        elif rate >= self.MED_PERCENT:
+            color = self.GREEN
+        else:
+            color = ''
+        return text.replace('[', color).replace(']', self.CLEAR).replace('|', u'│')
 
     def calc_and_filter_rates(self, lineno_samples):
         rates = {}
@@ -193,6 +201,10 @@ def process_event(event):
     processor.process_event(**event)
 
 def trace_end():
-    annotator = SourceAnnotator(processor.total_events)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--pretty', action='store_true')
+    args = parser.parse_args()
+
+    annotator = SourceAnnotator(total_events=processor.total_events, pretty=args.pretty)
     for source in processor.sources.values():
         annotator.annotate(source)
