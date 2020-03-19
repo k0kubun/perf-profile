@@ -118,7 +118,7 @@ class Source:
         return self.lineno_samples.get(lineno, 0)
 
 class SourceAnnotator:
-    MIN_PERCENT = 0.1 # TODO: add an option to change this
+    MIN_PERCENT = 0.1
     MED_PERCENT = 0.5
     TOP_PERCENT = 5.0
     SURROUND_LINES = 5
@@ -127,9 +127,10 @@ class SourceAnnotator:
     GREEN = u'\u001b[32m'
     CLEAR = u'\u001b[0m'
 
-    def __init__(self, total_events, pretty):
+    def __init__(self, total_events, pretty, min_percent):
         self.total_events = total_events
         self.pretty = pretty
+        self.min_percent = min_percent if min_percent else self.MIN_PERCENT
 
     def annotate(self, source):
         lineno_rates = self.calc_and_filter_rates(source.lineno_samples)
@@ -176,7 +177,7 @@ class SourceAnnotator:
         rates = {}
         for lineno, samples in lineno_samples.items():
             rate = 100.0 * samples / self.total_events
-            if rate > self.MIN_PERCENT:
+            if rate > self.min_percent:
                 rates[lineno] = rate
         return rates
 
@@ -193,6 +194,13 @@ class SourceAnnotator:
 
 
 def trace_begin():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--pretty', action='store_true', help='use unicode and color')
+    parser.add_argument('--min-percent', type=float, help='minimum rate to be shown')
+
+    global cmd_args
+    cmd_args = parser.parse_args()
+
     global processor
     processor = EventProcessor()
 
@@ -201,10 +209,7 @@ def process_event(event):
     processor.process_event(**event)
 
 def trace_end():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--pretty', action='store_true')
-    args = parser.parse_args()
-
-    annotator = SourceAnnotator(total_events=processor.total_events, pretty=args.pretty)
+    annotator = SourceAnnotator(total_events=processor.total_events,
+                                pretty=cmd_args.pretty, min_percent=cmd_args.min_percent)
     for source in processor.sources.values():
         annotator.annotate(source)
