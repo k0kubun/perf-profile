@@ -1,3 +1,4 @@
+# encoding: utf-8
 import bisect
 import os
 import re
@@ -142,10 +143,10 @@ class SourceAnnotator:
                     color = self.GREEN
                 else:
                     color = ''
-                print(u'[%6d (%5.2f%%)] |%6d | [%s]'.replace('[', color).replace(']', self.CLEAR) % (
+                print(u'[%6d (%5.2f%%)] │%6d │ [%s]'.replace('[', color).replace(']', self.CLEAR) % (
                     source.lineno_samples[lineno], rate, lineno, line))
             else:
-                print('                |%6d | %s' % (lineno, line))
+                print('                │%6d │ %s' % (lineno, line))
 
     def calc_and_filter_rates(self, lineno_samples):
         rates = {}
