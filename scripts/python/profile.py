@@ -127,7 +127,8 @@ class SourceAnnotator:
     GREEN = u'\u001b[32m'
     CLEAR = u'\u001b[0m'
 
-    def __init__(self, total_events, pretty, min_percent):
+    def __init__(self, out, total_events, pretty, min_percent):
+        self.out = out
         self.total_events = total_events
         self.pretty = pretty
         self.min_percent = min_percent if min_percent else self.MIN_PERCENT
@@ -141,25 +142,25 @@ class SourceAnnotator:
             with open(source.path, 'r') as f:
                 lines = f.readlines()
         except IOError as e:
-            print('\nFailed to annotate: ' + source.path)
-            print(e)
+            self.puts('\nFailed to annotate: ' + source.path)
+            self.puts(str(e))
             return
         linenos = self.pick_linenos(lineno_rates.keys(), len(lines))
 
-        print('\nFrom: ' + source.path)
+        self.puts('\nFrom: ' + source.path)
         prev_lineno = None
         for lineno in linenos:
             if prev_lineno and lineno != prev_lineno + 1:
-                print
+                self.puts()
             prev_lineno = lineno
 
             line = lines[lineno - 1].rstrip()
             if lineno in lineno_rates:
                 rate = lineno_rates[lineno]
-                print(self.prettify('[%6d (%5.2f%%)] |%6d | [%s]', rate) % (
+                self.puts(self.prettify('[%6d (%5.2f%%)] |%6d | [%s]', rate) % (
                     source.lineno_samples[lineno], rate, lineno, line))
             else:
-                print(self.prettify('                |%6d | %s') % (lineno, line))
+                self.puts(self.prettify('                |%6d | %s') % (lineno, line))
 
     def prettify(self, text, rate=0.0):
         if not self.pretty:
@@ -192,10 +193,14 @@ class SourceAnnotator:
             min_lineno = end_lineno + 1
         return linenos
 
+    def puts(self, text=''):
+        self.out.write(text.encode('utf-8') + '\n')
+
 
 def trace_begin():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--pretty', action='store_true', help='use unicode and color')
+    parser.add_argument('--no-pager', action='store_true', help='disable running less')
+    parser.add_argument('--no-pretty', action='store_true', help='disable color and unicode')
     parser.add_argument('--min-percent', type=float, help='minimum rate to be shown')
 
     global cmd_args
@@ -210,7 +215,21 @@ def process_event(event):
     processor.process_event(**event)
 
 def trace_end():
-    annotator = SourceAnnotator(total_events=processor.total_events,
-                                pretty=cmd_args.pretty, min_percent=cmd_args.min_percent)
+    if not sys.stdout.isatty() or cmd_args.no_pager:
+        popen = None
+        out = sys.stdout
+    else:
+        popen = subprocess.Popen(['less', '-R'], stdin=subprocess.PIPE)
+        out = popen.stdin
+
+    annotator = SourceAnnotator(out=out, pretty=(sys.stdout.isatty() and not cmd_args.no_pretty),
+                                total_events=processor.total_events, min_percent=cmd_args.min_percent)
     for source in processor.sources.values():
-        annotator.annotate(source)
+        try:
+            annotator.annotate(source)
+        except IOError: # pager closed
+            break
+
+    if popen:
+        popen.stdin.close()
+        os.waitpid(popen.pid, 0)
