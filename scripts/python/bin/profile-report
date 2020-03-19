@@ -1,0 +1,2 @@
+#!/bin/sh
+perf script -s "$PERF_EXEC_PATH"/scripts/python/profile.py -- "$@"

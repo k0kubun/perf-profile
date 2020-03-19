@@ -1,10 +1,11 @@
-# perf script: annotate-source
+# perf-profile
 
-Annotate a source without mixing asm by `perf script report annotate-source`
+Profiling C code with Linux perf made easy
 
 ## Prerequisite
 
-Prepare perf with libpython support. If you're using Ubuntu, you'd need to manually build it:
+Get perf with libpython support.
+If you're using Ubuntu, you'd need to manually build it as it's not supported by default:
 
 ```
 $ git clone --branch=v4.15 https://github.com/torvalds/linux
@@ -18,7 +19,7 @@ $ make
 Put this repository as `$prefix/libexec/perf-core` where `$prefix` is `$HOME` by default for perf built manually.
 
 ```
-$ git clone https://github.com/k0kubun/perf-script-annotate-source ~/libexec/perf-core
+$ git clone https://github.com/k0kubun/perf-profile ~/libexec/perf-core
 ```
 
 ## Usage
@@ -27,13 +28,13 @@ Run `perf record` as you like, and run:
 
 ```bash
 # Annotate all sources
-$ perf script report annotate-source
+$ perf script report profile
 
 # Annotate a single symbol
-$ perf script report annotate-source -- funcname
+$ perf script -S funcname report profile
 ```
 
-You can also trigger this by `r` at `perf report`.
+You can also trigger this by pushing `r` on `perf report`.
 
 ## License
 
