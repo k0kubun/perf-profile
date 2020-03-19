@@ -1,2 +1,2 @@
 #!/bin/sh
-perf record "$@"
+perf record --call-graph=dwarf "$@"

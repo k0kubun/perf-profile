@@ -24,7 +24,7 @@ $ git clone https://github.com/k0kubun/perf-profile ~/libexec/perf-core
 
 ## Usage
 
-Run `perf record` as you like, and run:
+Run `perf record --call-graph=dwarf`, and run:
 
 ```bash
 # Annotate all sources
