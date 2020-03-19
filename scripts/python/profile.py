@@ -29,7 +29,6 @@ class EventProcessor:
 
     def retrieve_dso(self, dso):
         if dso not in self.dsos:
-            print('Reading ' + dso + '...')
             self.dsos[dso] = DynamicSharedObject(dso)
         return self.dsos[dso]
 
@@ -39,14 +38,22 @@ class EventProcessor:
         return self.sources[source]
 
     def annotatable(self, sample):
-        # TODO: remove the hard coding
-        return sample.get('dso') and sample['dso'] not in ['[vdso]', '[kernel.kallsyms]', '/lib/x86_64-linux-gnu/libc-2.27.so', '/lib/x86_64-linux-gnu/libpthread-2.27.so']
+        return sample.get('dso') and self.retrieve_dso(sample['dso']).annotatable
 
 class DynamicSharedObject:
     def __init__(self, path):
+        self.annotatable = False
+        if path.startswith('[') and path.endswith(']'): # [kernel.kallsyms], [vdso]
+            return
+        print('Reading ' + path + '...')
+        try:
+            decodedline = subprocess.check_output(['objdump', '--dwarf=decodedline', path])
+        except subprocess.CalledProcessError:
+            return
+
         entries = []
         source = None
-        for line in subprocess.check_output(['objdump', '--dwarf=decodedline', path]).splitlines():
+        for line in decodedline.splitlines():
             match = re.match('^(CU: )?(?P<source>.+):$', line)
             if match:
                 source = match.group('source')
@@ -54,12 +61,16 @@ class DynamicSharedObject:
                 entry = re.split('\s+', line)
                 if len(entry) >= 3 and source and entry[0] == os.path.basename(source):
                     entries.append((source, int(entry[1]), int(entry[2], 0)))
+        if not entries:
+            print('Skipped ' + path + ' (no debug_line)')
+            return
 
         # List of `(source, lineno, address)` sorted by `address` for bisect
         self.entries = sorted(entries, key=lambda entry: entry[2])
         self.keys = [entry[2] for entry in self.entries]
 
         self.path_resolver = DynamicSharedObject.PathResolver(path)
+        self.annotatable = True
 
     def source_lineno(self, address):
         entry = self.entries[bisect.bisect_right(self.keys, address) - 1]
