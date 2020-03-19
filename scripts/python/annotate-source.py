@@ -105,8 +105,14 @@ class Source:
         return self.lineno_samples.get(lineno, 0)
 
 class SourceAnnotator:
-    MIN_PERCENT = 0.10 # TODO: add an option to change this
+    MIN_PERCENT = 0.1 # TODO: add an option to change this
+    MED_PERCENT = 0.5
+    TOP_PERCENT = 5.0
     SURROUND_LINES = 5
+
+    RED = u'\u001b[31m'
+    GREEN = u'\u001b[32m'
+    CLEAR = u'\u001b[0m'
 
     def __init__(self, total_events):
         self.total_events = total_events
@@ -127,11 +133,19 @@ class SourceAnnotator:
                 print('')
             prev_lineno = lineno
 
+            line = lines[lineno - 1].rstrip()
             if lineno in lineno_rates:
-                samples = source.lineno_samples[lineno]
-                print('%6d (%5.2f%%) |%6d | %s' % (samples, lineno_rates[lineno], lineno, lines[lineno - 1])),
+                rate = lineno_rates[lineno]
+                if rate >= self.TOP_PERCENT:
+                    color = self.RED
+                elif rate >= self.MED_PERCENT:
+                    color = self.GREEN
+                else:
+                    color = ''
+                print(u'[%6d (%5.2f%%)] |%6d | [%s]'.replace('[', color).replace(']', self.CLEAR) % (
+                    source.lineno_samples[lineno], rate, lineno, line))
             else:
-                print('                |%6d | %s' % (lineno, lines[lineno - 1])),
+                print('                |%6d | %s' % (lineno, line))
 
     def calc_and_filter_rates(self, lineno_samples):
         rates = {}
