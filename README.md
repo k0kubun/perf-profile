@@ -44,6 +44,7 @@ If you use Ubuntu, you'd need to manually build it as it's not supported by defa
 ```
 $ git clone --branch=v4.15 https://github.com/torvalds/linux
 $ cd linux/tools/perf
+# optional: libelf-dev libunwind-dev libaudit-dev libslang2-dev libdw-dev
 $ sudo apt install libpython-dev python-pip
 $ make
 ```
