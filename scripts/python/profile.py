@@ -63,7 +63,7 @@ class DynamicSharedObject:
                 if len(entry) >= 3 and source and entry[0] == os.path.basename(source):
                     entries.append((source, int(entry[1]), int(entry[2], 0)))
         if not entries:
-            print('Skipped ' + path + ' (no debug_line)')
+            print('Skipped %s (no debug_line)' % path)
             return
 
         # List of `(source, lineno, address)` sorted by `address` for bisect
@@ -142,12 +142,12 @@ class SourceAnnotator:
             with open(source.path, 'r') as f:
                 lines = f.readlines()
         except IOError as e:
-            self.puts('\nFailed to annotate: ' + source.path)
+            self.puts('\nFailed to annotate: %s' % source.path)
             self.puts(str(e))
             return
         linenos = self.pick_linenos(lineno_rates.keys(), len(lines))
 
-        self.puts('\nFrom: ' + source.path)
+        self.puts('\nFrom: %s' % source.path)
         prev_lineno = None
         for lineno in linenos:
             if prev_lineno and lineno != prev_lineno + 1:
@@ -194,7 +194,7 @@ class SourceAnnotator:
         return linenos
 
     def puts(self, text=''):
-        self.out.write(text.encode('utf-8') + '\n')
+        self.out.write('%s\n' % text.encode('utf-8'))
 
 
 def trace_begin():
@@ -211,7 +211,7 @@ def trace_begin():
 
 def process_event(event):
     if sys.stdout.isatty():
-        print('Processed: ' + str(processor.total_events) + '\r'),
+        print('Processed: %d\r' % processor.total_events),
     processor.process_event(**event)
 
 def trace_end():
