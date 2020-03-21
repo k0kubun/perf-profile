@@ -154,7 +154,7 @@ class SourceAnnotator:
                 self.puts()
             prev_lineno = lineno
 
-            line = lines[lineno - 1].rstrip()
+            line = lines[lineno - 1].rstrip().replace('\t', ' ' * 8)
             if lineno in lineno_rates:
                 rate = lineno_rates[lineno]
                 self.puts(self.prettify('[%6d (%5.2f%%)] |%6d | [%s]', rate) % (
