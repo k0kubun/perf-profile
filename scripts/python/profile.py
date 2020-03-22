@@ -13,20 +13,23 @@ from perf_trace_context import *
 from Core import *
 
 class EventProcessor:
-    def __init__(self):
+    def __init__(self, top):
+        self.top = top
         self.dsos = {}
         self.sources = {}
         self.total_events = 0
 
     def process_event(self, attr, sample, comm, ev_name, raw_buf, callchain, dso=None, symbol=None):
-        sample = next((frame for frame in callchain if self.annotatable(frame)), None)
-        if sample:
-            self.process_sample(**sample)
+        if self.top:
+            samples = next(([frame] for frame in callchain if self.annotatable(frame)), [])
+        else:
+            samples = [frame for frame in callchain if self.annotatable(frame)]
+        for source, lineno in set([self.source_lineno(**sample) for sample in samples]):
+            self.retrieve_source(source).increment_samples(lineno)
         self.total_events += 1
 
-    def process_sample(self, ip, dso, sym=None):
-        source, lineno = self.retrieve_dso(dso).source_lineno(ip)
-        self.retrieve_source(source).increment_samples(lineno)
+    def source_lineno(self, ip, dso, sym=None):
+        return self.retrieve_dso(dso).source_lineno(ip)
 
     def retrieve_dso(self, dso):
         if dso not in self.dsos:
@@ -199,6 +202,7 @@ class SourceAnnotator:
 
 def trace_begin():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--top', action='store_true', help='count only stack-top samples')
     parser.add_argument('--no-pager', action='store_true', help='disable running less')
     parser.add_argument('--no-pretty', action='store_true', help='disable color and unicode')
     parser.add_argument('--min-percent', type=float, help='minimum rate to be shown')
@@ -207,7 +211,7 @@ def trace_begin():
     cmd_args = parser.parse_args()
 
     global processor
-    processor = EventProcessor()
+    processor = EventProcessor(top=cmd_args.top)
 
 def process_event(event):
     if sys.stdout.isatty():
