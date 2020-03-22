@@ -150,7 +150,7 @@ class SourceAnnotator:
             return
         linenos = self.pick_linenos(lineno_rates.keys(), len(lines))
 
-        self.puts('\nFrom: %s' % source.path)
+        self.puts('\nFile:: %s' % source.path)
         prev_lineno = None
         for lineno in linenos:
             if prev_lineno and lineno != prev_lineno + 1:
