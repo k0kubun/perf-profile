@@ -219,6 +219,10 @@ def process_event(event):
     processor.process_event(**event)
 
 def trace_end():
+    if not processor.sources:
+        print('\nNo trace was annotatable by dwarf. Use: perf record --call-graph=dwarf')
+        return
+
     if not sys.stdout.isatty() or cmd_args.no_pager:
         popen = None
         out = sys.stdout
