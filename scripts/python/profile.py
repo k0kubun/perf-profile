@@ -13,8 +13,9 @@ from perf_trace_context import *
 from Core import *
 
 class EventProcessor:
-    def __init__(self, top):
+    def __init__(self, top, symbol):
         self.top = top
+        self.symbol = symbol
         self.dsos = {}
         self.sources = {}
         self.total_events = 0
@@ -27,12 +28,22 @@ class EventProcessor:
             self.retrieve_source(source).increment_samples(lineno)
         self.total_events += 1
 
-    def filter_callchain(self, callchain):
-        return [frame for frame in callchain
-                if 'dso' in frame and self.retrieve_dso(frame['dso']).annotatable]
+    def filter_callchain(self, samples):
+        samples = [sample for sample in samples
+                   if 'dso' in sample and self.retrieve_dso(sample['dso']).annotatable]
+        if self.symbol:
+            try:
+                rindex = len(samples) - [self.sym_name(**sample) for sample in samples][::-1].index(self.symbol)
+            except ValueError: # [symbol] is not in list
+                return []
+            samples = samples[0:rindex]
+        return samples
 
     def source_lineno(self, ip, dso, sym=None):
         return self.retrieve_dso(dso).source_lineno(ip)
+
+    def sym_name(self, ip, dso, sym=None):
+        return (sym or {}).get('name')
 
     def retrieve_dso(self, dso):
         if dso not in self.dsos:
@@ -207,6 +218,7 @@ class SourceAnnotator:
 
 def trace_begin():
     parser = argparse.ArgumentParser()
+    parser.add_argument('-S', '--symbol', help='count samples with or above a frame of the symbol')
     parser.add_argument('--top', action='store_true', help='count only stack-top samples')
     parser.add_argument('--no-pager', action='store_true', help='disable running less')
     parser.add_argument('--no-pretty', action='store_true', help='disable color and unicode')
@@ -216,7 +228,7 @@ def trace_begin():
     cmd_args = parser.parse_args()
 
     global processor
-    processor = EventProcessor(top=cmd_args.top)
+    processor = EventProcessor(top=cmd_args.top, symbol=cmd_args.symbol)
 
 def process_event(event):
     if sys.stdout.isatty():

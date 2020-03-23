@@ -28,7 +28,7 @@ So I needed to stick with perf.
 Using this tool, you can run:
 
 ```
-$ perf script -S vm_call_iseq_setup report profile
+$ perf script report profile -S vm_call_iseq_setup
 ```
 
 and see C code with profile information, without mixing machine code:
@@ -67,8 +67,8 @@ Run `perf record --call-graph=dwarf` normally, and run:
 # Annotate sources from all traces
 $ perf script report profile
 
-# Annotate traces including a specified symbol
-$ perf script -S funcname report profile
+# Annotate traces above a specified symbol
+$ perf script report profile -S funcname
 ```
 
 You can also trigger this by pushing `r` on `perf report`.
