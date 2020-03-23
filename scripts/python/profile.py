@@ -164,8 +164,10 @@ class SourceAnnotator:
             return
         linenos = self.pick_linenos(lineno_rates.keys(), len(lines))
 
-        self.puts('File:: %s (max: %d / %.2f%%)' % (
-            source.path, source.max_samples(), max(lineno_rates.values())))
+        max_rate = max(lineno_rates.values())
+        self.puts(self.prettify('File:: [%s (max: %d / %.2f%%)]', max_rate) % (
+            source.path, source.max_samples(), max_rate))
+
         prev_lineno = None
         for lineno in linenos:
             if prev_lineno and lineno != prev_lineno + 1:
