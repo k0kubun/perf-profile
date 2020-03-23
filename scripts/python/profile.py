@@ -148,12 +148,12 @@ class SourceAnnotator:
             with open(source.path, 'r') as f:
                 lines = f.readlines()
         except IOError as e:
-            self.puts('\nFailed to annotate: %s' % source.path)
+            self.puts('Failed to annotate: %s' % source.path)
             self.puts(str(e))
             return
         linenos = self.pick_linenos(lineno_rates.keys(), len(lines))
 
-        self.puts('\nFile:: %s (max: %d / %.2f%%)' % (
+        self.puts('File:: %s (max: %d / %.2f%%)' % (
             source.path, source.max_samples(), max(lineno_rates.values())))
         prev_lineno = None
         for lineno in linenos:
@@ -168,6 +168,7 @@ class SourceAnnotator:
                     source.lineno_samples[lineno], rate, lineno, line))
             else:
                 self.puts(self.prettify('                |%6d | %s') % (lineno, line))
+        self.puts()
 
     def prettify(self, text, rate=0.0):
         if not self.pretty:
