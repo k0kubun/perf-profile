@@ -120,6 +120,9 @@ class Source:
     def samples(self, lineno):
         return self.lineno_samples.get(lineno, 0)
 
+    def max_samples(self):
+        return max(self.lineno_samples.values())
+
 class SourceAnnotator:
     MIN_PERCENT = 0.1
     MED_PERCENT = 0.5
@@ -150,7 +153,8 @@ class SourceAnnotator:
             return
         linenos = self.pick_linenos(lineno_rates.keys(), len(lines))
 
-        self.puts('\nFile:: %s' % source.path)
+        self.puts('\nFile:: %s (max: %d / %.2f%%)' % (
+            source.path, source.max_samples(), max(lineno_rates.values())))
         prev_lineno = None
         for lineno in linenos:
             if prev_lineno and lineno != prev_lineno + 1:
@@ -232,7 +236,7 @@ def trace_end():
 
     annotator = SourceAnnotator(out=out, pretty=(sys.stdout.isatty() and not cmd_args.no_pretty),
                                 total_events=processor.total_events, min_percent=cmd_args.min_percent)
-    for source in processor.sources.values():
+    for source in sorted(processor.sources.values(), key=lambda source: -source.max_samples()):
         try:
             annotator.annotate(source)
         except IOError: # pager closed
