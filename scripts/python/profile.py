@@ -20,13 +20,16 @@ class EventProcessor:
         self.total_events = 0
 
     def process_event(self, attr, sample, comm, ev_name, raw_buf, callchain, dso=None, symbol=None):
+        samples = self.filter_callchain(callchain)
         if self.top:
-            samples = next(([frame] for frame in callchain if self.annotatable(frame)), [])
-        else:
-            samples = [frame for frame in callchain if self.annotatable(frame)]
+            samples = samples[0:1]
         for source, lineno in set([self.source_lineno(**sample) for sample in samples]):
             self.retrieve_source(source).increment_samples(lineno)
         self.total_events += 1
+
+    def filter_callchain(self, callchain):
+        return [frame for frame in callchain
+                if 'dso' in frame and self.retrieve_dso(frame['dso']).annotatable]
 
     def source_lineno(self, ip, dso, sym=None):
         return self.retrieve_dso(dso).source_lineno(ip)
@@ -40,9 +43,6 @@ class EventProcessor:
         if source not in self.sources:
             self.sources[source] = Source(source)
         return self.sources[source]
-
-    def annotatable(self, sample):
-        return sample.get('dso') and self.retrieve_dso(sample['dso']).annotatable
 
 class DynamicSharedObject:
     def __init__(self, path):
