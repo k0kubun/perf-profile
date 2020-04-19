@@ -13,18 +13,22 @@ from perf_trace_context import *
 from Core import *
 
 class EventProcessor:
-    def __init__(self, top, symbol):
+    def __init__(self, top, symbol, inline):
         self.top = top
         self.symbol = symbol
+        self.inline = inline
         self.dsos = {}
         self.sources = {}
         self.total_events = 0
 
-    def process_event(self, attr, sample, comm, ev_name, raw_buf, callchain, dso=None, symbol=None):
+    def process_event(self, callchain, **rest):
         samples = self.filter_callchain(callchain)
         if self.top:
             samples = samples[0:1]
-        for source, lineno in set([self.source_lineno(**sample) for sample in samples]):
+        source_linenos = []
+        for sample in samples:
+            source_linenos += self.source_linenos(**sample)
+        for source, lineno in set(source_linenos):
             self.retrieve_source(source).increment_samples(lineno)
         self.total_events += 1
 
@@ -39,8 +43,11 @@ class EventProcessor:
             samples = samples[0:rindex]
         return samples
 
-    def source_lineno(self, ip, dso, sym=None):
-        return self.retrieve_dso(dso).source_lineno(ip)
+    def source_linenos(self, ip, dso, sym=None):
+        source_linenos = [self.retrieve_dso(dso).source_lineno(ip)]
+        if self.inline:
+            source_linenos += self.retrieve_dso(dso).inlined_source_linenos(ip)
+        return source_linenos
 
     def sym_name(self, ip, dso, sym=None):
         return (sym or {}).get('name')
@@ -84,17 +91,30 @@ class DynamicSharedObject:
         self.entries = sorted(entries, key=lambda entry: entry[2])
         self.keys = [entry[2] for entry in self.entries]
 
-        self.path_resolver = DynamicSharedObject.PathResolver(path)
+        dwarf_info = subprocess.check_output(['objdump', '--dwarf=info', path])
+        self.path_resolver = DynamicSharedObject.PathResolver(dwarf_info)
+        self.inlined_subroutine = DynamicSharedObject.InlinedSubroutine(dwarf_info, path_resolver=self.path_resolver)
         self.annotatable = True
 
     def source_lineno(self, address):
         entry = self.entries[bisect.bisect_right(self.keys, address) - 1]
         return (self.path_resolver.expand_path(entry[0], address=address), entry[1])
 
+    def inlined_source_linenos(self, address):
+        return self.inlined_subroutine.source_linenos(address)
+
+    class InlinedSubroutine:
+        def __init__(self, dwarf_info, path_resolver):
+            self.path_resolver = path_resolver
+
+        def source_linenos(self, address):
+            # TODO: implement this
+            return []
+
     class PathResolver:
-        def __init__(self, dso):
-            dwarf_info = subprocess.check_output(['objdump', '--dwarf=info', dso])
+        def __init__(self, dwarf_info):
             entries = []
+            # FIXME: ranges and high_pc are not handled properly
             for match in re.finditer('\n\s+<[\da-f]+>\s+DW_AT_comp_dir\s+: \([^)]+\): (?P<comp_dir>.+)' +
                                     '(\n\s+<[\da-f]+>\s+DW_AT_ranges\s+: .+)?' +
                                      '\n\s+<[\da-f]+>\s+DW_AT_low_pc\s+: (?P<low_pc>0x[\da-f]+)\n', dwarf_info):
@@ -222,6 +242,7 @@ def trace_begin():
     parser = argparse.ArgumentParser()
     parser.add_argument('-S', '--symbol', help='count samples with or above a frame of the symbol')
     parser.add_argument('--top', action='store_true', help='count only stack-top samples')
+    parser.add_argument('--no-inline', action='store_true', help='disable counting inlined locations')
     parser.add_argument('--no-pager', action='store_true', help='disable running less')
     parser.add_argument('--no-pretty', action='store_true', help='disable color and unicode')
     parser.add_argument('--min-percent', type=float, help='minimum rate to be shown')
@@ -230,7 +251,7 @@ def trace_begin():
     cmd_args = parser.parse_args()
 
     global processor
-    processor = EventProcessor(top=cmd_args.top, symbol=cmd_args.symbol)
+    processor = EventProcessor(top=cmd_args.top, symbol=cmd_args.symbol, inline=not cmd_args.no_inline)
 
 def process_event(event):
     if sys.stdout.isatty():
